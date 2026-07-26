@@ -74,90 +74,276 @@ tests/
 docs/                        Strategy, traceability, defect and résumé evidence
 ```
 
-## Run it
+## Run and verify locally
 
-Prerequisites: .NET 8 SDK, Docker Desktop, and Node.js 22+.
+This guide assumes Windows and PowerShell. On macOS or Linux, use `curl` instead
+of `curl.exe` and adjust path separators. Run every command from the repository
+root.
 
-```bash
-docker compose up --build
+### 1. Check the prerequisites
+
+Install and start the following tools:
+
+| Tool | Required version | Check |
+|---|---:|---|
+| .NET SDK | 8.x | `dotnet --version` |
+| Docker Desktop | Current stable | `docker version` |
+| Node.js | 22+ | `node --version` |
+| PowerShell | 7+ | `pwsh --version` |
+
+Open PowerShell in the cloned project:
+
+```powershell
+cd "C:\path\to\CSharp_RiskFeed_Automation"
+dotnet --version
+docker version
+node --version
 ```
 
-Open:
+Docker must be running before integration, UI, or performance tests are
+started.
 
-- Dashboard: [http://localhost:8088](http://localhost:8088)
-- Swagger UI: [http://localhost:8088/swagger](http://localhost:8088/swagger)
-- Readiness: [http://localhost:8088/health/ready](http://localhost:8088/health/ready)
+### 2. Start the application
 
-The default Compose credentials are local-demo values. Copy `.env.example` to
-`.env` and replace the password before using a shared environment.
-
-An authorized request looks like:
-
-```bash
-curl \
-  -H "X-Client-Id: portfolio-demo" \
-  -H "X-Entitlements: risk:read" \
-  "http://localhost:8088/api/v1/risk-feed?portfolioId=PF-ALPHA&limit=10"
+```powershell
+docker compose up --build -d
+docker compose ps
 ```
 
-Stop the stack with:
+Wait until both `postgres` and `api` report `healthy`. If either service does
+not start, inspect its logs:
 
-```bash
-docker compose down
+```powershell
+docker compose logs --tail 100 api
+docker compose logs --tail 50 postgres
 ```
 
-Use `docker compose down --volumes` only when you also want to remove the local
-demo database.
+Open the following pages:
 
-## Test execution
+| Page | URL | Expected result |
+|---|---|---|
+| React dashboard | [http://localhost:8088](http://localhost:8088) | Risk feed control room |
+| Swagger UI | [http://localhost:8088/swagger](http://localhost:8088/swagger) | Three risk-feed operations |
+| OpenAPI contract | [http://localhost:8088/swagger/v1/swagger.json](http://localhost:8088/swagger/v1/swagger.json) | OpenAPI JSON |
+| Readiness | [http://localhost:8088/health/ready](http://localhost:8088/health/ready) | `Healthy` |
+| Liveness | [http://localhost:8088/health/live](http://localhost:8088/health/live) | `{"status":"Healthy"}` |
 
-### Unit quality gate
+Compose uses local-demo credentials. Before using a shared environment, copy
+`.env.example` to `.env`, replace the password, and never commit `.env`.
 
-```bash
-dotnet test tests/RiskFeed.UnitTests \
-  --configuration Release \
-  /p:CollectCoverage=true \
-  /p:CoverletOutputFormat=cobertura \
-  /p:Threshold=80 \
+### 3. Check the dashboard manually
+
+Use this short acceptance checklist:
+
+| Scenario | Expected result |
+|---|---|
+| Open `PF-ALPHA` | Quality `PASS`, 10 validated records, chart visible, 8 table rows |
+| Select `PF-BETA` | Quality `PASS`, 8 validated records, chart refreshes, first row contains `XAUUSD` |
+| Use Chrome DevTools at `390 x 844` | Portfolio control and chart remain visible with no horizontal scrollbar |
+
+### 4. Check the REST API manually
+
+An entitled read must return `200 OK`, an `X-Correlation-ID` header, records in
+descending sequence order, quality status `Pass`, and zero sequence gaps:
+
+```powershell
+curl.exe -i `
+  -H "X-Client-Id: manual-tester" `
+  -H "X-Entitlements: risk:read" `
+  "http://localhost:8088/api/v1/risk-feed?portfolioId=PF-ALPHA&limit=5"
+```
+
+Check the negative security and query paths:
+
+```powershell
+# Expected: 401 Unauthorized
+curl.exe -i `
+  "http://localhost:8088/api/v1/risk-feed?portfolioId=PF-ALPHA"
+
+# Expected: 403 Forbidden
+curl.exe -i `
+  -H "X-Client-Id: manual-tester" `
+  -H "X-Entitlements: profile:read" `
+  "http://localhost:8088/api/v1/risk-feed?portfolioId=PF-ALPHA"
+
+# Expected: 400 Bad Request
+curl.exe -i `
+  -H "X-Client-Id: manual-tester" `
+  -H "X-Entitlements: risk:read" `
+  "http://localhost:8088/api/v1/risk-feed?portfolioId=PF-ALPHA&limit=501"
+```
+
+Create a unique, valid event:
+
+```powershell
+$eventId = [guid]::NewGuid()
+$sequence = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+$body = @{
+    eventId     = $eventId.ToString()
+    portfolioId = "PF-MANUAL"
+    instrument  = "EURUSD"
+    metric      = "ValueAtRisk95"
+    value       = 125000.50
+    currency    = "USD"
+    asOfUtc     = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
+    sequence    = $sequence
+    source      = "manual-verification"
+} | ConvertTo-Json -Compress
+
+curl.exe -i `
+  -X POST `
+  -H "Content-Type: application/json" `
+  -H "X-Client-Id: manual-tester" `
+  -H "X-Entitlements: risk:write" `
+  --data-raw $body `
+  "http://localhost:8088/api/v1/risk-feed"
+```
+
+Expect `201 Created` and a `Location` header. Read the stored event:
+
+```powershell
+curl.exe -i `
+  -H "X-Client-Id: manual-tester" `
+  -H "X-Entitlements: risk:read" `
+  "http://localhost:8088/api/v1/risk-feed/$eventId"
+```
+
+Expect `200 OK` and the same event values. Repeat the previous POST without
+changing `$body`; the database uniqueness rule must return `409 Conflict`.
+
+Check data-quality rejection with deliberately invalid data:
+
+```powershell
+$badBody = @{
+    eventId     = ([guid]::NewGuid()).ToString()
+    portfolioId = "pf-invalid"
+    instrument  = "BAD INSTRUMENT"
+    metric      = "ValueAtRisk95"
+    value       = -10
+    currency    = "US"
+    asOfUtc     = (Get-Date).ToUniversalTime().AddMinutes(5).ToString("o")
+    sequence    = 0
+    source      = "INVALID SOURCE"
+} | ConvertTo-Json -Compress
+
+curl.exe -i `
+  -X POST `
+  -H "Content-Type: application/json" `
+  -H "X-Client-Id: manual-tester" `
+  -H "X-Entitlements: risk:write" `
+  --data-raw $badBody `
+  "http://localhost:8088/api/v1/risk-feed"
+```
+
+Expect `422 Unprocessable Entity` with errors for `portfolioId`, `instrument`,
+`currency`, `asOfUtc`, and `sequence`.
+
+### 5. Confirm API-to-database consistency
+
+Query PostgreSQL independently and confirm that it contains exactly one row
+matching the event created above:
+
+```powershell
+docker compose exec -T postgres psql `
+  -U riskfeed `
+  -d riskfeed `
+  -c "SELECT event_id, portfolio_id, instrument, metric, risk_value, currency, sequence_no, source FROM risk_events WHERE event_id = '$eventId';"
+```
+
+View the record and sequence ranges for every portfolio:
+
+```powershell
+docker compose exec -T postgres psql `
+  -U riskfeed `
+  -d riskfeed `
+  -c "SELECT portfolio_id, COUNT(*) AS records, MIN(sequence_no) AS min_sequence, MAX(sequence_no) AS max_sequence FROM risk_events GROUP BY portfolio_id ORDER BY portfolio_id;"
+```
+
+### 6. Run the main quality gate
+
+This single script restores locked dependencies, checks formatting, builds with
+warnings treated as errors, enforces unit coverage, runs the API/contract/
+PostgreSQL tests, and type-checks and builds React:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\run-quality-gate.ps1
+```
+
+Expected final line: `CI QUALITY GATE PASSED`.
+
+| Gate | Expected baseline |
+|---|---|
+| Build | 0 warnings and 0 errors |
+| Unit tests | 22 passed; at least 80% line coverage (`RiskFeed.Core` baseline: 91.48%) |
+| API, OpenAPI contract, entitlement, and PostgreSQL | 10 passed |
+| React | Type-check and production build passed |
+
+To run only one test layer while troubleshooting:
+
+```powershell
+dotnet test tests/RiskFeed.UnitTests -c Release `
+  /p:CollectCoverage=true `
+  /p:CoverletOutputFormat=cobertura `
+  /p:Threshold=80 `
   /p:ThresholdType=line
+
+# Docker is required because Testcontainers starts a disposable PostgreSQL.
+dotnet test tests/RiskFeed.IntegrationTests -c Release
 ```
 
-### API, contract, and PostgreSQL tests
+The integration suite compares HTTP results with direct PostgreSQL queries, so
+an API assertion cannot hide a persistence or mapping defect.
 
-These tests use Testcontainers and need Docker:
+### 7. Run the C# Playwright UI tests
 
-```bash
-dotnet test tests/RiskFeed.IntegrationTests --configuration Release
-```
-
-They verify the HTTP result and then query PostgreSQL independently so a
-passing API assertion cannot hide a persistence or mapping defect.
-
-### C# Playwright tests
-
-Start the Compose stack, build the test project, install Chromium once, and run:
+Keep Compose running, build the tests, and install Chromium once:
 
 ```powershell
 dotnet build tests/RiskFeed.UiTests -c Release
 pwsh tests/RiskFeed.UiTests/bin/Release/net8.0/playwright.ps1 install chromium
+
+$env:UI_BASE_URL = "http://localhost:8088"
+$env:UI_ARTIFACT_DIR = "$PWD\.artifacts\ui"
 dotnet test tests/RiskFeed.UiTests -c Release --no-build
 ```
 
-### NBomber performance gate
+Expect 3 passed tests covering the desktop dashboard, portfolio refresh, and
+mobile layout. Screenshots are written to `.artifacts/ui/`.
 
-With the Compose stack running:
+### 8. Run the NBomber performance gate
 
-```bash
+Keep Compose running:
+
+```powershell
 dotnet run --project tests/RiskFeed.PerformanceTests -c Release
 ```
 
-Defaults: 25 requests/second for 30 seconds, less than 1% failures, and p95
-under 300 ms. Override with `PERF_RATE`, `PERF_DURATION_SECONDS`,
-`PERF_MAX_ERROR_PERCENT`, and `PERF_MAX_P95_MS`. HTML evidence is written to
-`.artifacts/performance/`.
+The default profile sends 25 requests/second for 30 seconds and passes only
+when failures are below 1% and p95 latency is below 300 ms. Override the
+defaults with `PERF_RATE`, `PERF_DURATION_SECONDS`,
+`PERF_MAX_ERROR_PERCENT`, and `PERF_MAX_P95_MS`.
 
-NBomber's current license permits personal/hobby portfolio use; organizations
-should review its commercial terms before adopting this suite internally.
+Expect `PERFORMANCE GATE PASSED`. HTML evidence is written to
+`.artifacts/performance/`. NBomber's current license permits personal/hobby
+portfolio use; organizations should review its commercial terms before
+adopting this suite internally.
+
+### 9. Stop or reset the environment
+
+Stop the services but keep the demo database:
+
+```powershell
+docker compose down
+```
+
+Delete the services and demo database for a completely fresh run:
+
+```powershell
+docker compose down --volumes
+```
+
+Use `--volumes` only when deleting the local PostgreSQL data is intentional.
 
 ## CI quality gate
 

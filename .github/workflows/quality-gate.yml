@@ -1,0 +1,144 @@
+name: CI quality gate
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  build-and-test:
+    name: Build, contract, data and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: src/RiskFeed.Web/package-lock.json
+
+      - name: Restore .NET dependencies
+        run: dotnet restore RiskFeed.sln --locked-mode
+
+      - name: Verify formatting
+        run: dotnet format RiskFeed.sln --verify-no-changes --no-restore
+
+      - name: Build with warnings as errors
+        run: dotnet build RiskFeed.sln --configuration Release --no-restore
+
+      - name: Unit tests and coverage gate
+        run: >-
+          dotnet test tests/RiskFeed.UnitTests/RiskFeed.UnitTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=unit-tests.trx"
+          /p:CollectCoverage=true
+          /p:CoverletOutput=../../.artifacts/coverage/unit/
+          /p:CoverletOutputFormat=cobertura
+          /p:Threshold=80
+          /p:ThresholdType=line
+
+      - name: API, OpenAPI contract and PostgreSQL tests
+        run: >-
+          dotnet test tests/RiskFeed.IntegrationTests/RiskFeed.IntegrationTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=integration-tests.trx"
+
+      - name: Build React dashboard
+        working-directory: src/RiskFeed.Web
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Publish quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence
+          path: |
+            **/TestResults/*.trx
+            .artifacts/coverage/**
+            src/RiskFeed.Web/dist/**
+          if-no-files-found: warn
+
+  playwright:
+    name: Playwright desktop and mobile UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Build UI automation
+        run: |
+          dotnet restore tests/RiskFeed.UiTests/RiskFeed.UiTests.csproj --locked-mode
+          dotnet build tests/RiskFeed.UiTests/RiskFeed.UiTests.csproj --configuration Release --no-restore
+
+      - name: Install Playwright Chromium
+        run: >-
+          pwsh tests/RiskFeed.UiTests/bin/Release/net8.0/playwright.ps1
+          install --with-deps chromium
+
+      - name: Start production-like stack
+        run: |
+          docker compose up --detach --build
+          sh scripts/wait-for-health.sh
+
+      - name: Run C# Playwright tests
+        env:
+          UI_BASE_URL: http://localhost:8088
+          UI_ARTIFACT_DIR: ${{ github.workspace }}/.artifacts/ui
+        run: >-
+          dotnet test tests/RiskFeed.UiTests/RiskFeed.UiTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=ui-tests.trx"
+
+      - name: Capture container logs
+        if: always()
+        run: docker compose logs --no-color > container-logs.txt
+
+      - name: Publish UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-evidence
+          path: |
+            **/TestResults/*.trx
+            .artifacts/ui/**
+            container-logs.txt
+          if-no-files-found: warn
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down --volumes

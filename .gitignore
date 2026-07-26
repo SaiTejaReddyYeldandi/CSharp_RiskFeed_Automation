@@ -1,0 +1,35 @@
+# Build output
+**/bin/
+**/obj/
+.artifacts/
+TestResults/
+playwright-report/
+coverage/
+
+# Local tool/runtime state
+.dotnet/
+.dotnet-home/
+.nuget/
+.playwright-browsers/
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Front-end dependencies and output
+node_modules/
+src/RiskFeed.Web/dist/
+*.tsbuildinfo
+src/RiskFeed.Web/vite.config.js
+src/RiskFeed.Web/vite.config.d.ts
+
+# Local environment and containers
+.env
+*.local
+
+# Temporary working files
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db

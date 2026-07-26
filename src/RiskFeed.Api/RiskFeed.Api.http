@@ -1,0 +1,31 @@
+@RiskFeedApi = http://localhost:8088
+
+GET {{RiskFeedApi}}/health
+Accept: application/json
+
+###
+
+GET {{RiskFeedApi}}/api/v1/risk-feed?portfolioId=PF-ALPHA&limit=10
+Accept: application/json
+X-Client-Id: local-developer
+X-Entitlements: risk:read
+X-Correlation-ID: 8664fca5-4b59-42fa-9f03-a778fe54d700
+
+###
+
+POST {{RiskFeedApi}}/api/v1/risk-feed
+Content-Type: application/json
+X-Client-Id: local-developer
+X-Entitlements: risk:write
+
+{
+  "eventId": "93d30b8f-ac61-44c0-96d6-0f564711a040",
+  "portfolioId": "PF-GAMMA",
+  "instrument": "GBPUSD",
+  "metric": "ValueAtRisk95",
+  "value": 54120.25,
+  "currency": "USD",
+  "asOfUtc": "2026-07-26T10:30:00Z",
+  "sequence": 3001,
+  "source": "risk-engine-v1"
+}

@@ -1,0 +1,72 @@
+name: NBomber performance gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      rate:
+        description: Requests per second
+        required: false
+        default: "25"
+      duration:
+        description: Test duration in seconds
+        required: false
+        default: "30"
+  schedule:
+    - cron: "30 3 * * 1"
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+
+      - name: Restore NBomber project
+        run: >-
+          dotnet restore
+          tests/RiskFeed.PerformanceTests/RiskFeed.PerformanceTests.csproj
+          --locked-mode
+
+      - name: Start production-like stack
+        run: |
+          docker compose up --detach --build
+          sh scripts/wait-for-health.sh
+
+      - name: Run NBomber SLO gate
+        env:
+          PERF_BASE_URL: http://localhost:8088
+          PERF_RATE: ${{ inputs.rate || '25' }}
+          PERF_DURATION_SECONDS: ${{ inputs.duration || '30' }}
+          PERF_MAX_ERROR_PERCENT: "1"
+          PERF_MAX_P95_MS: "300"
+        run: >-
+          dotnet run
+          --project tests/RiskFeed.PerformanceTests/RiskFeed.PerformanceTests.csproj
+          --configuration Release
+          --no-restore
+
+      - name: Publish NBomber report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nbomber-performance-report
+          path: .artifacts/performance/**
+          if-no-files-found: warn
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down --volumes

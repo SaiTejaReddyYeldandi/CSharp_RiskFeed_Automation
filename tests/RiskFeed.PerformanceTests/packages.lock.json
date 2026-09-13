@@ -4,25 +4,25 @@
     "net8.0": {
       "NBomber": {
         "type": "Direct",
-        "requested": "[6.5.0, )",
-        "resolved": "6.5.0",
-        "contentHash": "5dg6uYVIf7heLXW5Z2SdceBSrGgxBBF9ejemYUzOQ9ob02eV8SwifhB1mnMqUfqjHTzZJNdP+WvuMnWZTJDX+Q==",
+        "requested": "[6.6.0, )",
+        "resolved": "6.6.0",
+        "contentHash": "wB6l9A8vjbUjJ0lFS/BABwkTDvAdXvF72/37xoADK7DWW1hZWYxgj27fv5ySwlrDabf2C4rwdQZWNoxh74yMXA==",
         "dependencies": {
           "ConsoleTables": "[2.4.2]",
           "ExpressionTreeToString": "3.4.71",
-          "FSharp.Core": "10.1.301",
+          "FSharp.Core": "10.1.400",
           "FSharp.SystemTextJson": "1.4.36",
           "FSharp.UMX": "1.1.0",
           "FsToolkit.ErrorHandling.IcedTasks": "5.2.0",
           "FuncyDown": "1.4.2",
           "HdrHistogram": "2.5.0",
           "NATS.Client": "1.1.6",
-          "NBomber.Contracts": "[6.2.1]",
+          "NBomber.Contracts": "[6.3.0]",
           "Serilog.Enrichers.Environment": "3.0.1",
           "Serilog.Enrichers.Thread": "4.0.0",
           "Serilog.Settings.Configuration": "9.0.0",
           "Serilog.Sinks.File": "6.0.0",
-          "Serilog.Sinks.SpectreConsole": "[0.3.3]",
+          "Serilog.Sinks.SpectreConsole": "[0.4.0]",
           "System.CommandLine": "2.0.7",
           "System.Net.Http": "4.3.4",
           "System.Reactive": "6.0.1",
@@ -49,8 +49,8 @@
       },
       "FSharp.Core": {
         "type": "Transitive",
-        "resolved": "10.1.301",
-        "contentHash": "excLf2zM/qUB3WhRUfI0xvOOaPwcRAEdYT/BXe9eiTKySnWVuIKMQTf5+6ETy5nsb1dpLp1s2j2yAM/XcRgFMg=="
+        "resolved": "10.1.400",
+        "contentHash": "H9wlZ/tWgNp+Q4WQ5aUSi3XOBXrL6z+UkR0PNeyDFyoZR3c3PbtA21B9FqlthrhEwQ6f5AtQV0JLhBBDqjjscw=="
       },
       "FSharp.Json.New": {
         "type": "Transitive",
@@ -265,17 +265,17 @@
       },
       "NBomber.Contracts": {
         "type": "Transitive",
-        "resolved": "6.2.1",
-        "contentHash": "hW+Q4L8aRPpCNnx4YM6xjbdUcJ33qSWr2SJLmYk/URiKLH/YqxFn9Z4cIHPXuV5xnU0C8T6fNhVpfIxw9+h8aw==",
+        "resolved": "6.3.0",
+        "contentHash": "6TViB36R56GrciuophJrtdBDPJvXpOSuiqWQ6relYU7DTRvSNhoIHDi7q1kOIFgAN8CHKos14PW7wSMocnMnJg==",
         "dependencies": {
-          "FSharp.Core": "10.1.301",
+          "FSharp.Core": "10.1.302",
           "FSharp.Json.New": "0.5.0",
           "FSharp.UMX": "1.1.0",
           "MessagePack": "2.5.302",
           "MessagePack.FSharpExtensions": "4.0.0",
           "Microsoft.Extensions.Configuration.Binder": "9.0.7",
           "Microsoft.Extensions.Configuration.Json": "9.0.7",
-          "Serilog": "4.2.0"
+          "Serilog": "4.3.1"
         }
       },
       "NETStandard.Library": {
@@ -446,8 +446,8 @@
       },
       "Serilog": {
         "type": "Transitive",
-        "resolved": "4.2.0",
-        "contentHash": "gmoWVOvKgbME8TYR+gwMf7osROiWAURterc6Rt2dQyX7wtjZYpqFiA/pY6ztjGQKKV62GGCyOcmtP1UKMHgSmA=="
+        "resolved": "4.3.1",
+        "contentHash": "savYe7h5yRlkqBVOwP8cIRDOdqKiPmYCU4W87JH38sBmcKD5EBoXvQIw6bNEvZ/pTe1gsiye3VFCzBsoppGkXQ=="
       },
       "Serilog.Enrichers.Environment": {
         "type": "Transitive",
@@ -485,21 +485,26 @@
       },
       "Serilog.Sinks.SpectreConsole": {
         "type": "Transitive",
-        "resolved": "0.3.3",
-        "contentHash": "Lw3CBuJQ+HY4Pso3km7isrDXdmLpwZ5sgt1SXr5v6UEkO2hsSP4iHIXvLKbCgJyvUyxikVn0iFQMj4eGfl4/TA==",
+        "resolved": "0.4.0",
+        "contentHash": "rS3B2ZPzSWsV9NV2Ardvjyjff1sVkt5M7ryKh5ZcUvtnSBVP71c4uPCcBcVAd64/+xHORer1g2fkkrehkyhRmw==",
         "dependencies": {
-          "FSharp.Core": "6.0.5",
-          "Serilog": "2.10.0",
-          "Spectre.Console": "0.45.0"
+          "FSharp.Core": "10.1.302",
+          "Serilog": "4.3.1",
+          "Spectre.Console": "0.57.2"
         }
       },
       "Spectre.Console": {
         "type": "Transitive",
-        "resolved": "0.45.0",
-        "contentHash": "e//13o8/BCrWmwN26eJ4zCzD2iq7iUlqQd+nDI9nJUdnJ/rYAanYiNFZZ7YHwlv48IKuKtRYYP6/wPt1DG67ww==",
+        "resolved": "0.57.2",
+        "contentHash": "wzsB+P9i6F9G+cFOJxRotCiQWNSzZVAMxi8YMiHlGXXU1JLMXGp7zSSqBMmROZS2bzpK5jk+Saa7Evp8HwqhKg==",
         "dependencies": {
-          "System.Memory": "4.5.5"
+          "Spectre.Console.Ansi": "0.57.2"
         }
+      },
+      "Spectre.Console.Ansi": {
+        "type": "Transitive",
+        "resolved": "0.57.2",
+        "contentHash": "Y1+u73shwP+JYHmrkdN6bSt2kaGBEAafhi2nrecczbXdFRey+k7J/WF9YPfcB0rqivv2S8fmif6FSBq9m/AFvw=="
       },
       "System.AppContext": {
         "type": "Transitive",
@@ -754,11 +759,6 @@
           "System.Runtime.Extensions": "4.3.0",
           "System.Threading": "4.3.0"
         }
-      },
-      "System.Memory": {
-        "type": "Transitive",
-        "resolved": "4.5.5",
-        "contentHash": "XIWiDvKPXaTveaB7HVganDlOCRoj03l+jrwNvcge/t8vhGYKvqV+dMv6G4SAX2NoNmN0wZfVPTAlFwZcZvVOUw=="
       },
       "System.Net.Http": {
         "type": "Transitive",
